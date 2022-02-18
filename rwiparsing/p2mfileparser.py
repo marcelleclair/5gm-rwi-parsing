@@ -107,23 +107,31 @@ class P2mFileParser:
     def get_data_dict(self):
         return self.data
 
-    def write_data_dict(self, filename):
+    def write_p2m(self, filename):
         file = open(filename, 'w')
         # TODO: Write header text with variable names, might need to create a new hardcoded list of units
-        self._write_dict(self.data, file)
+        lines = self._dict_to_lines(self.data)
+        file.writelines(lines)
         file.close()
 
-    def _write_dict(self, d, file):
-        for key, value in enumerate(d):
-            line = ""
-            if not isinstance(d, collections.OrderedDict):
-                line += str(value) + ' '
+    def _dict_to_lines(self, d):
+        lines = []
+        line = ""
+        for key in d:
+            value = d[key]
+            if not isinstance(value, dict):
+                if isinstance(value, float):
+                    line += "%.10e" % value + ' '
+                else:
+                    line += str(value) + ' '
             else:
-                self._write_dict(value, file)
-        line = line.strip() + "\n"
-        file.write(line)
-
-
+                if line:
+                    lines.append(line.strip() + "\n")
+                    line = ""
+                lines += self._dict_to_lines(value)
+        if not lines:
+            lines.append(line.strip() + "\n")
+        return lines
 
     def _parse_meta(self):
         match = re.match(P2mFileParser._filename_match_re,
@@ -146,8 +154,9 @@ class P2mFileParser:
                 except ParsingError:
                     break
             self.n_receivers = len(self.data)
-            self.data["n_receivers"] = self.n_receivers
-            self.data.move_to_end("n_receivers", last=False)
+            # single-layer p2m files (power, mtoa, etc) don't write the total number of receivers, so omitit from data
+            # self.data["n_receivers"] = self.n_receivers
+            # self.data.move_to_end("n_receivers", last=False)
 
     def _parse_receiver(self):
         #raise NotImplementedError()
@@ -156,8 +165,6 @@ class P2mFileParser:
         receiver = int(sp_line[0])
         self.data[receiver] = collections.OrderedDict()
         for index, name in enumerate(headers[self.p2m_type]):
-            if index == 0:
-                continue
             self.data[receiver][name] = formats[self.p2m_type][index](sp_line[index])  # cast to correct type
 
     def _get_next_line(self):
@@ -202,38 +209,23 @@ class P2mPathParser(P2mFileParser):
         # OrderedDict indices start at 1, mirroring the numbering scheme used in WI p2m files
         line = self._get_next_line()
         receiver, n_paths = [int(i) for i in line.split()]
-        self.data[receiver] = collections.OrderedDict()
-        self.data[receiver]["n_paths"] = n_paths
+        rx_ind = receiver - 1
+        self.data[rx_ind] = collections.OrderedDict()
+        self.data[rx_ind]["receiver"] = receiver
+        self.data[rx_ind]["n_paths"] = n_paths
         for i in range(n_paths):
             line = self._get_next_line()
             sp_line = line.split()
-            path = int(sp_line[0])
-            self.data[receiver][path] = collections.OrderedDict()
+            #path = int(sp_line[0])
+            self.data[rx_ind][i] = collections.OrderedDict()
             # self.data[receiver][i] = collections.OrderedDict()
             for index, name in enumerate(headers[self.p2m_type]):
-                if index == 0:
-                    continue
-                self.data[receiver][path][name] = formats[self.p2m_type][index](sp_line[index])  # cast to correct type
+                self.data[rx_ind][i][name] = formats[self.p2m_type][index](sp_line[index])  # cast to correct type
 
 
 if __name__ == '__main__':
-    fname = "../example/SA1/WI_ALL_OUTPUTS.power.t001_01.r003.p2m"
-    power_p2m = P2mFileParser(fname)
+    fname = "../example/SA1/WI_ALL_OUTPUTS.cir.t001_01.r003.p2m"
+    power_p2m = P2mPathParser(fname)
+    power_p2m.write_p2m("test.p2m")
     print("DONE")
-    # fname = "../example/iter0.doa.t001_05.r006.p2m"
-    # doa = P2mPathParser(fname)
-    # data = doa.get_data_dict()
-    # phi = []
-    # theta = []
-    # power = []
-    # for i in range(1, data[1]["n_paths"] + 1):
-    #     #print(data[1][i])
-    #     phi.append(data[1][i]["phi"])
-    #     theta.append(data[1][i]["theta"])
-    #     power.append(data[1][i]["power"])
-    # print("phi = ")
-    # print(phi)
-    # print("theta = ")
-    # print(theta)
-    # print("power = ")
-    # print(power)
+
