@@ -123,10 +123,23 @@ class P2mFileParser:
         with open(self.filename) as self.file:
             self._parse_meta()
             self.data = collections.OrderedDict()
-            self._parse_receiver()
+            while True:
+                # read lines until none remain
+                try:
+                    self._parse_receiver()
+                except ParsingError:
+                    break
 
     def _parse_receiver(self):
-        raise NotImplementedError()
+        #raise NotImplementedError()
+        line = self._get_next_line()
+        sp_line = line.split()
+        receiver = int(sp_line[0])
+        self.data[receiver] = collections.OrderedDict()
+        for index, name in enumerate(headers[self.p2m_type]):
+            if index == 0:
+                continue
+            self.data[receiver][name] = formats[self.p2m_type][index](sp_line[index])  # cast to correct type
 
     def _get_next_line(self):
         """Get the next uncommedted line of the file
