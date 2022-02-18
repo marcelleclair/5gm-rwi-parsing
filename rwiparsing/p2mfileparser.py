@@ -1,7 +1,6 @@
 import re
 import os
 import collections
-from pydoc import locate
 
 import numpy as np
 
@@ -67,7 +66,7 @@ formats = {
     "paths": [],  # TODO: this one is tricky, come back to it
     "pg": [int, float, float, float, float, float],
     "pl": [int, float, float, float, float, float],
-    "float": [int, float, float, float, float, float, float],
+    "power": [int, float, float, float, float, float, float],
     "spread": [int, float, float, float, float, float],
     "toa": [int, float, float],
     "txloss": [int, float, float, float, float, float],
@@ -88,7 +87,6 @@ class P2mFileParser:
     """Parser for p2m files. It currently support doa, paths and cir. Notice the regular expression in the code."""
 
     # project.type.tx_y.rz.p2m
-    # TODO: edit regex to include all file types
     _filename_match_re = (r'^(?P<project>.*)' +
                           r'\.' +
                           r'(?P<type>\w*)' +
@@ -108,6 +106,24 @@ class P2mFileParser:
 
     def get_data_dict(self):
         return self.data
+
+    def write_data_dict(self, filename):
+        file = open(filename, 'w')
+        # TODO: Write header text with variable names, might need to create a new hardcoded list of units
+        self._write_dict(self.data, file)
+        file.close()
+
+    def _write_dict(self, d, file):
+        for key, value in enumerate(d):
+            line = ""
+            if not isinstance(d, collections.OrderedDict):
+                line += str(value) + ' '
+            else:
+                self._write_dict(value, file)
+        line = line.strip() + "\n"
+        file.write(line)
+
+
 
     def _parse_meta(self):
         match = re.match(P2mFileParser._filename_match_re,
@@ -129,6 +145,9 @@ class P2mFileParser:
                     self._parse_receiver()
                 except ParsingError:
                     break
+            self.n_receivers = len(self.data)
+            self.data["n_receivers"] = self.n_receivers
+            self.data.move_to_end("n_receivers", last=False)
 
     def _parse_receiver(self):
         #raise NotImplementedError()
@@ -198,20 +217,23 @@ class P2mPathParser(P2mFileParser):
 
 
 if __name__ == '__main__':
-    fname = "../example/iter0.doa.t001_05.r006.p2m"
-    doa = P2mPathParser(fname)
-    data = doa.get_data_dict()
-    phi = []
-    theta = []
-    power = []
-    for i in range(1, data[1]["n_paths"] + 1):
-        #print(data[1][i])
-        phi.append(data[1][i]["phi"])
-        theta.append(data[1][i]["theta"])
-        power.append(data[1][i]["power"])
-    print("phi = ")
-    print(phi)
-    print("theta = ")
-    print(theta)
-    print("power = ")
-    print(power)
+    fname = "../example/SA1/WI_ALL_OUTPUTS.power.t001_01.r003.p2m"
+    power_p2m = P2mFileParser(fname)
+    print("DONE")
+    # fname = "../example/iter0.doa.t001_05.r006.p2m"
+    # doa = P2mPathParser(fname)
+    # data = doa.get_data_dict()
+    # phi = []
+    # theta = []
+    # power = []
+    # for i in range(1, data[1]["n_paths"] + 1):
+    #     #print(data[1][i])
+    #     phi.append(data[1][i]["phi"])
+    #     theta.append(data[1][i]["theta"])
+    #     power.append(data[1][i]["power"])
+    # print("phi = ")
+    # print(phi)
+    # print("theta = ")
+    # print(theta)
+    # print("power = ")
+    # print(power)
