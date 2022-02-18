@@ -107,10 +107,23 @@ class P2mFileParser:
     def get_data_dict(self):
         return self.data
 
+    def get_data_ndarray(self):
+        # converts data OrderedDict into ndarray for easier manipulation
+        # numpy dtype for indexing columns by name, causes problems so omitted for now
+        dt = np.dtype({'names': headers[self.p2m_type], 'formats': formats[self.p2m_type]})
+        data_ndarray = np.zeros((self.n_receivers, len(self.data[0])))
+        for i in range(self.n_receivers):
+            for j, key in enumerate(self.data[i]):
+                data_ndarray[i][j] = self.data[i][key]
+        return data_ndarray
+
     def write_p2m(self, filename):
         file = open(filename, 'w')
-        # TODO: Write header text with variable names, might need to create a new hardcoded list of units
-        lines = self._dict_to_lines(self.data)
+        lines = ["<Transmitter Set: Tx: " + str(self.transmitter) +
+                 " - Point " + str(self.transmitter_set) + ">\n",
+                 "<Receiver Set: Rx: " + str(self.receiver_set) + ">\n"]
+        # TODO: Add variable names to header text
+        lines += self._dict_to_lines(self.data)
         file.writelines(lines)
         file.close()
 
@@ -154,7 +167,7 @@ class P2mFileParser:
                 except ParsingError:
                     break
             self.n_receivers = len(self.data)
-            # single-layer p2m files (power, mtoa, etc) don't write the total number of receivers, so omitit from data
+            # single-layer p2m files (power, mtoa, etc) don't write the total number of receivers, so omit it from data
             # self.data["n_receivers"] = self.n_receivers
             # self.data.move_to_end("n_receivers", last=False)
 
@@ -162,10 +175,10 @@ class P2mFileParser:
         #raise NotImplementedError()
         line = self._get_next_line()
         sp_line = line.split()
-        receiver = int(sp_line[0])
-        self.data[receiver] = collections.OrderedDict()
+        rx_ind = int(sp_line[0]) - 1
+        self.data[rx_ind] = collections.OrderedDict()
         for index, name in enumerate(headers[self.p2m_type]):
-            self.data[receiver][name] = formats[self.p2m_type][index](sp_line[index])  # cast to correct type
+            self.data[rx_ind][name] = formats[self.p2m_type][index](sp_line[index])  # cast to correct type
 
     def _get_next_line(self):
         """Get the next uncommedted line of the file
@@ -224,8 +237,9 @@ class P2mPathParser(P2mFileParser):
 
 
 if __name__ == '__main__':
-    fname = "../example/SA1/WI_ALL_OUTPUTS.cir.t001_01.r003.p2m"
-    power_p2m = P2mPathParser(fname)
-    power_p2m.write_p2m("test.p2m")
+    fname = "../example/SA1/WI_ALL_OUTPUTS.power.t001_01.r003.p2m"
+    power_p2m = P2mFileParser(fname)
+    #power_p2m.write_p2m("test.p2m")
+    data_ndarray = power_p2m.get_data_ndarray()
     print("DONE")
 
