@@ -111,11 +111,22 @@ class P2mFileParser:
         # converts data OrderedDict into ndarray for easier manipulation
         # numpy dtype for indexing columns by name, causes problems so omitted for now
         dt = np.dtype({'names': headers[self.p2m_type], 'formats': formats[self.p2m_type]})
-        data_ndarray = np.zeros((self.n_receivers, len(self.data[0])))
+        # data_ndarray = np.zeros((self.n_receivers, len(self.data[0])))
+        data_ndarray = np.zeros(self.n_receivers, dtype=dt)
         for i in range(self.n_receivers):
             for j, key in enumerate(self.data[i]):
                 data_ndarray[i][j] = self.data[i][key]
         return data_ndarray
+
+    def update_data_dict(self, data_ndarray):
+        if len(data_ndarray) != self.n_receivers or len(data_ndarray.dtype) != len(headers[self.p2m_type]):
+            raise ParsingError("incorrect ndarray dimensions, expected [" + str(self.n_receivers) + ",] array of " +
+                               str(len(headers[self.p2m_type])) + "-tuples")
+        if data_ndarray.dtype.names != tuple(headers[self.p2m_type]):
+            raise ParsingError("dtype names do not match expected column names for *." + self.p2m_type + ".p2m files")
+        for i in range(self.n_receivers):
+            for key in self.data[i]:
+                self.data[i][key] = data_ndarray[i]["key"]
 
     def write_p2m(self, filename):
         file = open(filename, 'w')
@@ -181,7 +192,7 @@ class P2mFileParser:
             self.data[rx_ind][name] = formats[self.p2m_type][index](sp_line[index])  # cast to correct type
 
     def _get_next_line(self):
-        """Get the next uncommedted line of the file
+        """Get the next uncommented line of the file
 
         Call this only if a new line is expected
         """
