@@ -229,6 +229,7 @@ class P2mPathParser(P2mFileParser):
             self.data["n_receivers"] = self.n_receivers
             for rec in range(self.n_receivers):
                 self._parse_receiver()
+
     # TODO: Override get_data_ndarray and update_data_dict to account for multi-level data dict
     def _parse_header(self):
         """read the first line of the file, indicating the number of receivers"""
@@ -271,14 +272,14 @@ class MIMOCsvParser(P2mFileParser):
                           r'\.' +
                           r'txEl(?P<transmitter_element>\d+)' +
                           r'\.' +
-                          r'rxEL(?P<receiver_element>\d+)' +
+                          r'rxEl(?P<receiver_element>\d+)' +
                           r'\.' +
                           r'inst(?P<instance>\d+)' +
                           r'\.'
                           r'csv$')
 
     def _parse_meta(self):
-        match = re.match(P2mFileParser._filename_match_re,
+        match = re.match(self._filename_match_re,
                          os.path.basename(self.filename))
 
         # self.project = match.group('project')
@@ -289,11 +290,19 @@ class MIMOCsvParser(P2mFileParser):
         self.receiver_set = int(match.group('receiver_set'))
         self.receiver_element = int(match.group('receiver_element'))
 
+    def _parse_receiver(self):
+        line = self._get_next_line()
+        sp_line = line.split(',')
+        rx_ind = int(sp_line[0]) - 1
+        self.data[rx_ind] = collections.OrderedDict()
+        for index, name in enumerate(headers[self.p2m_type]):
+            self.data[rx_ind][name] = formats[self.p2m_type][index](sp_line[index])  # cast to correct type
+
 
 if __name__ == '__main__':
-    fname = "../example/SA1/WI_ALL_OUTPUTS.power.t001_01.r003.p2m"
-    power_p2m = P2mFileParser(fname)
+    fname = "../example/power/power.txSet001.txPt001.rxSet003.txEl001.rxEl001.inst001.csv"
+    power_csv = MIMOCsvParser(fname)
     #power_p2m.write_p2m("test.p2m")
-    data_ndarray = power_p2m.get_data_ndarray()
+    data_ndarray = power_csv.get_data_ndarray()
     print("DONE")
 
